@@ -1,0 +1,100 @@
+import base64
+import hmac
+import hashlib
+import json
+from typing import Optional
+
+from fastapi import FastAPI, Form, Cookie, Body
+from fastapi.responses import Response
+
+
+app = FastAPI()
+
+SECRET_KEY = "37a417012fee00a2aa24d93009f70a062e2fd08a1a4f789bf6dc38a65bfac0b3"
+PASSWORD_SALT = "1a2bc796dc3924e9f8d18ef8d863c149beae7abecf284ecf810366adbc29c1d1"
+
+
+def sign_data(data: str) -> str:
+    """Возвращает подписанные данные дата"""
+    return (hmac.new
+        (
+        SECRET_KEY.encode(),
+        msg=data.encode(),
+        digestmod=hashlib.sha256
+        ).hexdigest().upper())
+
+def get_username_from_signed_string(username_signed: str) -> Optional[str]:
+    username_base64, sign = username_signed.split(".")
+    username = base64.b64decode(username_base64.encode()).decode()
+    valid_sing = sign_data(username)
+    if hmac.compare_digest(valid_sing, sign):
+        return username
+
+def verify_password(username: str, password: str) -> bool:
+    password_hash = hashlib.sha256( (password + PASSWORD_SALT).encode() ).hexdigest().lower()
+    stored_password_hash = users[username]['password'].lower()
+    return  stored_password_hash == password_hash
+
+
+users = {
+    "saku10@gmail.com":
+    {
+        "name": "Andrei",
+        "password": '40228ad7c08f0445eaa7ea52cd33386c6f7668ee368cbcafa438f3adf6069ccb',
+        "balance": 696969,
+    },
+    "petr@mail.ru":
+    {
+        "name": "Petya",
+        "password": 'd75020756007c659a924b527ed6d8640925fb73cfdf653850b9850d1307445de',
+        "balance": 123454,
+    }
+}
+
+
+@app.get("/")
+def index_page(username: Optional[str] = Cookie(default=None)):
+    with open('templates/login.html') as f:
+        login_page = f.read()
+    if not username:
+        return Response(login_page, media_type="text/html")
+    valid_username = get_username_from_signed_string(username)
+    if not valid_username:
+        response = Response(login_page, media_type="text/html")
+        response.delete_cookie(key="username")
+        return response
+    try:
+        user = users[valid_username]
+    except KeyError:
+        response = Response(login_page, media_type="text/html")
+        response.delete_cookie(key="username")
+        return response
+    return Response(f"Привет, {user['name']}", media_type="text/html")
+
+
+
+@app.post("/login")
+# def process_login_page(username : str = Form(...), password : str = Form(...)):
+def process_login_page(data: dict = Body(..., media_type="text/plain")):
+    print('Ваша data', data)
+    username = data['username']
+    password = data['password']
+    user = users.get(username)
+    if not user or not verify_password(username, password):
+        return Response(
+            json.dumps({
+                    "success": False,
+                    "message": "Ты кто блять такой?!"
+            }),
+            media_type="text/json")
+
+    response = Response(
+        json.dumps({
+            "success": True,
+            "message": f"Ваше имя: {user['name']}<br />Ваш баланс: {user['balance']}",
+        }),
+        media_type="text/json")
+
+    username_signed = base64.b64encode(username.encode()).decode() + '.' + sign_data(username)
+    response.set_cookie(key="username", value=username_signed)
+    return response
