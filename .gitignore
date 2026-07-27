@@ -1,0 +1,10 @@
+.env
+users.json
+.DS_Store
+.idea/
+__pycache__/
+env/
+.venv/
+*.pyc
+*.log
+*.tmp

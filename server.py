@@ -3,16 +3,19 @@ import base64
 import hmac
 import hashlib
 import json
+import os
+from dotenv import load_dotenv
 from typing import Optional
 
-from fastapi import FastAPI, Form, Cookie, Body
+from fastapi import FastAPI, Cookie, Body
 from fastapi.responses import Response
 
 
 app = FastAPI()
 
-SECRET_KEY = "37a417012fee00a2aa24d93009f70a062e2fd08a1a4f789bf6dc38a65bfac0b3"
-PASSWORD_SALT = "1a2bc796dc3924e9f8d18ef8d863c149beae7abecf284ecf810366adbc29c1d1"
+load_dotenv()
+SECRET_KEY = str(os.getenv("SECRET_KEY"))
+PASSWORD_SALT = str(os.getenv("PASSWORD_SALT"))
 
 
 def sign_data(data: str) -> str:
@@ -30,6 +33,8 @@ def get_username_from_signed_string(username_signed: str) -> Optional[str]:
     valid_sing = sign_data(username)
     if hmac.compare_digest(valid_sing, sign):
         return username
+    return None
+
 
 def verify_password(username: str, password: str) -> bool:
     password_hash = hashlib.sha256( (password + PASSWORD_SALT).encode() ).hexdigest().lower()
@@ -37,20 +42,10 @@ def verify_password(username: str, password: str) -> bool:
     return  stored_password_hash == password_hash
 
 
-users = {
-    "saku10@gmail.com":
-    {
-        "name": "Andrei",
-        "password": '40228ad7c08f0445eaa7ea52cd33386c6f7668ee368cbcafa438f3adf6069ccb',
-        "balance": 696969,
-    },
-    "petr@mail.ru":
-    {
-        "name": "Petya",
-        "password": 'd75020756007c659a924b527ed6d8640925fb73cfdf653850b9850d1307445de',
-        "balance": 123454,
-    }
-}
+
+with open("users.json", "r") as db:
+    users = json.load(db)
+
 
 
 @app.get("/")
@@ -85,7 +80,7 @@ def process_login_page(data: dict = Body(..., media_type="text/plain")):
         return Response(
             json.dumps({
                     "success": False,
-                    "message": "Ты кто блять такой?!"
+                    "message": "Ты кто такой?!"
             }),
             media_type="text/json")
 
