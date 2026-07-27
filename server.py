@@ -70,7 +70,6 @@ def index_page(username: Optional[str] = Cookie(default=None)):
 
 
 @app.post("/login")
-# def process_login_page(username : str = Form(...), password : str = Form(...)):
 def process_login_page(data: dict = Body(..., media_type="text/plain")):
     print('Ваша data', data)
     username = data['username']
